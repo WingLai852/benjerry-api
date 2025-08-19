@@ -1,4 +1,13 @@
 {
+  "name": "benjerrys-api",
+  "version": "1.0.0",
+  "description": "API for Ben & Jerry's custom ice cream orders",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "dev": "nodemon server.js",
+    "start": "node server.js"
+  },
   "dependencies": {
     "cors": "^2.8.5",
     "dotenv": "^17.2.1",
