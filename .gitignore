@@ -1,0 +1,11 @@
+# Node
+node_modules
+npm-debug.log
+yarn-error.log
+
+# Env bestanden (bevat wachtwoorden en sleutels!)
+.env
+
+# Mac / editor trash
+.DS_Store
+.vscode
