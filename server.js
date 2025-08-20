@@ -3,6 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import { connectDB } from "./config/db.js";
 import ordersRouter from "./routes/orders.routes.js";
+import authRouter from "./routes/auth.routes.js";
 
 dotenv.config();
 
@@ -21,6 +22,8 @@ app.get("/health", (req, res) => {
 app.get("/", (_req, res) => {
   res.send("Ben & Jerry's API running 🍨");
 });
+
+app.use("/auth", authRouter);
 
 const PORT = process.env.PORT || 4000;
 
