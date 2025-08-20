@@ -1,22 +1,36 @@
 import { Router } from "express";
 import { Order } from "../models/Order.js";
 import { isValidObjectId } from "../utils/validateObjectId.js";
+import { requireAdmin } from "../middleware/auth.js";
 
 const router = Router();
 
-// POST /orders - nieuwe bestelling plaatsen
+/**
+ * POST /orders
+ * Nieuwe bestelling plaatsen (open voor bezoekers)
+ */
 router.post("/", async (req, res) => {
   try {
     const { customerName, address, items, totalPrice } = req.body;
 
-    if (!customerName || !address || !Array.isArray(items) || items.length === 0 || totalPrice == null) {
-      return res.status(400).json({ error: "customerName, address, items[], totalPrice zijn verplicht" });
+    if (
+      !customerName ||
+      !address ||
+      !Array.isArray(items) ||
+      items.length === 0 ||
+      totalPrice == null
+    ) {
+      return res
+        .status(400)
+        .json({ error: "customerName, address, items[], totalPrice zijn verplicht" });
     }
 
-    // simpele check per item
+    // basisvalidatie per item
     for (const item of items) {
       if (!item.baseFlavor || !item.topping) {
-        return res.status(400).json({ error: "Elk item heeft baseFlavor en topping nodig" });
+        return res
+          .status(400)
+          .json({ error: "Elk item heeft baseFlavor en topping nodig" });
       }
     }
 
@@ -28,16 +42,39 @@ router.post("/", async (req, res) => {
   }
 });
 
-// GET /orders - alle bestellingen ophalen (voor admin lijst)
-router.get("/", async (_req, res) => {
+/**
+ * GET /orders?page=1&limit=10&status=te_verwerken
+ * Lijst met paginatie & optionele status-filter (handig voor admin UI)
+ */
+router.get("/", async (req, res) => {
   try {
-    const orders = await Order.find().sort({ createdAt: -1 });
-    res.json(orders);
+    const page = Math.max(parseInt(req.query.page) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 10, 1), 50);
+    const skip = (page - 1) * limit;
+
+    const filter = {};
+    if (req.query.status) {
+      filter.status = req.query.status;
+    }
+
+    const [items, total] = await Promise.all([
+      Order.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+      Order.countDocuments(filter),
+    ]);
+
+    res.json({
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      items,
+    });
   } catch (err) {
     console.error("GET /orders error:", err.message);
     res.status(500).json({ error: "Interne serverfout" });
   }
 });
+
 /**
  * GET /orders/:id
  * Haal 1 bestelling op (detail view)
@@ -61,9 +98,9 @@ router.get("/:id", async (req, res) => {
 
 /**
  * PATCH /orders/:id/status
- * Verander status: te_verwerken | verzonden | geannuleerd
+ * Verander status: te_verwerken | verzonden | geannuleerd  (admin)
  */
-router.patch("/:id/status", async (req, res) => {
+router.patch("/:id/status", requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
@@ -73,15 +110,12 @@ router.patch("/:id/status", async (req, res) => {
     }
     const allowed = ["te_verwerken", "verzonden", "geannuleerd"];
     if (!allowed.includes(status)) {
-      return res.status(400).json({ error: `status moet één van ${allowed.join(", ")} zijn` });
+      return res
+        .status(400)
+        .json({ error: `status moet één van ${allowed.join(", ")} zijn` });
     }
 
-    const order = await Order.findByIdAndUpdate(
-      id,
-      { status },
-      { new: true } // geef geüpdatete doc terug
-    );
-
+    const order = await Order.findByIdAndUpdate(id, { status }, { new: true });
     if (!order) return res.status(404).json({ error: "Bestelling niet gevonden" });
 
     res.json(order);
@@ -93,9 +127,9 @@ router.patch("/:id/status", async (req, res) => {
 
 /**
  * DELETE /orders/:id
- * Verwijder bestelling
+ * Verwijder bestelling (admin)
  */
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     if (!isValidObjectId(id)) {
